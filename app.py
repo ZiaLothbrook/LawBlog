@@ -165,9 +165,34 @@ class FileManager:
             f.write(content)
         return filename
 
+# class UserSession:
+#     USERS = {
+#         "admin": {"password": "password123", "firm": "Legal Partners", "location": "New York"}
+#     }
+    
+#     @staticmethod
+#     def login(username, password):
+#         if username in UserSession.USERS and UserSession.USERS[username]['password'] == password:
+#             session['user'] = {
+#                 'username': username,
+#                 'firm': UserSession.USERS[username]['firm'],
+#                 'location': UserSession.USERS[username]['location']
+#             }
+#             return True
+#         return False
+    
+#     @staticmethod
+#     def get_current_user():
+#         return session.get('user')
+
 class UserSession:
     USERS = {
-        "admin": {"password": "password123", "firm": "Legal Partners", "location": "New York"}
+        "admin": {
+            "password": "password123", 
+            "firm": "Legal Partners", 
+            "location": "New York",
+            "custom_tones": []  # Add this line to store custom tones
+        }
     }
     
     @staticmethod
@@ -176,14 +201,31 @@ class UserSession:
             session['user'] = {
                 'username': username,
                 'firm': UserSession.USERS[username]['firm'],
-                'location': UserSession.USERS[username]['location']
+                'location': UserSession.USERS[username]['location'],
+                'custom_tones': UserSession.USERS[username].get('custom_tones', [])
             }
             return True
         return False
     
     @staticmethod
+    def add_custom_tone(username, tone_name, tone_description):
+        if username in UserSession.USERS:
+            if 'custom_tones' not in UserSession.USERS[username]:
+                UserSession.USERS[username]['custom_tones'] = []
+            
+            # Check if tone already exists
+            if not any(t['name'] == tone_name for t in UserSession.USERS[username]['custom_tones']):
+                UserSession.USERS[username]['custom_tones'].append({
+                    'name': tone_name,
+                    'description': tone_description
+                })
+                return True
+        return False
+    
+    @staticmethod
     def get_current_user():
         return session.get('user')
+
 
 class ToneSelector:
     @staticmethod
@@ -240,28 +282,46 @@ def dashboard():
     if not user:
         return redirect(url_for('login'))
     
-    # Define tone options and their descriptions
-    tone_options = [
-        'Professional',
-        'Conversational',
-        'Authoritative',
-        'Friendly',
-        'Technical'
+    # Combine standard tones with user's custom tones
+    all_tones = [
+        ('Professional', 'Formal and business-like tone suitable for corporate audiences'),
+        ('Conversational', 'Casual and engaging tone that feels like a friendly discussion'),
+        ('Authoritative', 'Strong and confident tone that establishes expertise'),
+        ('Friendly', 'Warm and approachable tone that builds rapport with readers'),
+        ('Technical', 'Detailed and precise tone focused on accuracy and technical details')
     ]
     
-    tone_descriptions = {
-        'Professional': 'Formal and business-like tone suitable for corporate audiences',
-        'Conversational': 'Casual and engaging tone that feels like a friendly discussion',
-        'Authoritative': 'Strong and confident tone that establishes expertise',
-        'Friendly': 'Warm and approachable tone that builds rapport with readers',
-        'Technical': 'Detailed and precise tone focused on accuracy and technical details'
-    }
+    # Add custom tones if they exist
+    custom_tones = user.get('custom_tones', [])
+    for tone in custom_tones:
+        all_tones.append((tone['name'], tone['description']))
+    
+    # Convert to the format expected by the template
+    tone_options = [t[0] for t in all_tones]
+    tone_descriptions = {t[0]: t[1] for t in all_tones}
     
     return render_template('dashboard.html', 
                          username=user['username'],
                          articles=FileManager.list_articles(),
                          tone_options=tone_options,
                          tone_descriptions=tone_descriptions)
+
+@app.route('/add_tone', methods=['POST'])
+def add_tone():
+    user = UserSession.get_current_user()
+    if not user:
+        return redirect(url_for('login'))
+    
+    tone_name = request.form.get('tone_name')
+    tone_description = request.form.get('tone_description')
+    
+    if tone_name and tone_description:
+        if UserSession.add_custom_tone(user['username'], tone_name, tone_description):
+            # Update session with new tones
+            session['user']['custom_tones'] = UserSession.USERS[user['username']]['custom_tones']
+            return {'success': True}
+    
+    return {'success': False}
 
 @app.route('/select/<article>', methods=['GET', 'POST'])
 def select_article(article):

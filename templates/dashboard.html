@@ -48,17 +48,45 @@
         padding-top: 1rem;
         border-top: 1px dashed #dee2e6;
     }
+    .save-tone-container {
+        margin-top: 0.5rem;
+        padding: 0.75rem;
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+    }
     .card-body.text-center {
         text-align: left !important;
     }
     .article-card .btn {
         text-align: center;
     }
+    .custom-tone-item {
+        background-color: #e8f4ff;
+        border-left: 3px solid #0d6efd;
+    }
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1100;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="card shadow-sm">
+    <!-- Toast notification container -->
+    <div class="toast-container">
+        <div id="toast" class="toast align-items-center text-white bg-success" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toast-message">
+                    Tone saved successfully!
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
     <div class="card-header bg-white">
         <div class="d-flex justify-content-between align-items-center">
             <h1 class="h3 mb-0">Available Articles</h1>
@@ -92,14 +120,14 @@
                         <div id="tone-selection-{{ article_index }}" class="tone-selection" style="display: none;">
                             <h3 class="h6 mb-3">Select Writing Tone</h3>
                             
+                            <!-- Standard Tones -->
                             {% for tone in tone_options %}
-                            {% set tone_index = loop.index %}
-                            <div class="tone-option" id="tone-option-{{ tone_index }}-{{ article_index }}">
+                            <div class="tone-option" id="tone-option-{{ loop.index }}-{{ article_index }}">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="tone-{{ article_index }}" 
-                                           id="tone-{{ tone_index }}-{{ article_index }}" value="{{ tone }}"
+                                           id="tone-{{ loop.index }}-{{ article_index }}" value="{{ tone }}"
                                            {% if loop.first %}checked{% endif %}>
-                                    <label class="form-check-label" for="tone-{{ tone_index }}-{{ article_index }}">
+                                    <label class="form-check-label" for="tone-{{ loop.index }}-{{ article_index }}">
                                         <strong>{{ tone }}</strong>
                                     </label>
                                 </div>
@@ -107,21 +135,53 @@
                             </div>
                             {% endfor %}
                             
-                            <div class="tone-option" id="tone-option-custom-{{ article_index }}">
+                            <!-- Saved Custom Tones -->
+                            {% if session.user and session.user.custom_tones %}
+                            {% for custom_tone in session.user.custom_tones %}
+                            <div class="tone-option custom-tone-item" id="saved-tone-{{ loop.index }}-{{ article_index }}">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="tone-{{ article_index }}" 
-                                           id="tone-custom-{{ article_index }}" value="custom">
-                                    <label class="form-check-label" for="tone-custom-{{ article_index }}">
-                                        <strong>Custom Tone</strong>
+                                           id="tone-saved-{{ loop.index }}-{{ article_index }}" value="{{ custom_tone.name }}">
+                                    <label class="form-check-label" for="tone-saved-{{ loop.index }}-{{ article_index }}">
+                                        <strong>{{ custom_tone.name }}</strong>
+                                    </label>
+                                </div>
+                                <div class="tone-description">{{ custom_tone.description }}</div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                            
+                            <!-- Create New Tone Option -->
+                            <div class="tone-option" id="tone-option-new-{{ article_index }}">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="tone-{{ article_index }}" 
+                                           id="tone-new-{{ article_index }}" value="custom">
+                                    <label class="form-check-label" for="tone-new-{{ article_index }}">
+                                        <strong>Create New Tone</strong>
                                     </label>
                                 </div>
                             </div>
                             
+                            <!-- Custom Tone Input -->
                             <div id="customToneGroup-{{ article_index }}" class="custom-tone-container" style="display: none;">
-                                <div class="form-floating">
-                                    <textarea class="form-control" name="custom_tone-{{ article_index }}" id="customTone-{{ article_index }}"
-                                              placeholder="Describe your desired tone..." style="height: 100px"></textarea>
+                                <div class="form-floating mb-2">
+                                    <textarea class="form-control" name="custom_tone-{{ article_index }}" 
+                                              id="customTone-{{ article_index }}"
+                                              placeholder="Describe your desired tone..." 
+                                              style="height: 100px"></textarea>
                                     <label for="customTone-{{ article_index }}">Describe your preferred writing style</label>
+                                </div>
+                                
+                                <!-- Save Tone Section -->
+                                <div id="save-tone-group-{{ article_index }}" class="save-tone-container">
+                                    <div class="input-group mb-2">
+                                        <input type="text" class="form-control" id="tone-name-{{ article_index }}" 
+                                               placeholder="Name for this tone (e.g. 'Legal Marketing')">
+                                    </div>
+                                    <button type="button" class="btn btn-success btn-sm save-tone" 
+                                            data-index="{{ article_index }}">
+                                        <i data-feather="plus" class="icon-sm me-1"></i>Save Tone
+                                    </button>
                                 </div>
                             </div>
                             
@@ -156,6 +216,15 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Feather icons
+        if (feather) {
+            feather.replace();
+        }
+
+        // Initialize Bootstrap toast
+        const toastEl = document.getElementById('toast');
+        const toast = toastEl ? new bootstrap.Toast(toastEl, {autohide: true, delay: 3000}) : null;
+
         // Show tone selection when article is selected
         function showToneSelection(index) {
             document.getElementById(`tone-selection-${index}`).style.display = 'block';
@@ -169,7 +238,8 @@
         // Handle tone selection
         document.querySelectorAll('input[type="radio"][name^="tone-"]').forEach(radio => {
             radio.addEventListener('change', function() {
-                const index = this.id.split('-')[2];
+                const parts = this.id.split('-');
+                const index = parts.length > 3 ? parts[3] : parts[2];
                 
                 // Remove selected class from all options
                 document.querySelectorAll(`.tone-option[id^="tone-option-"][id$="-${index}"]`).forEach(option => {
@@ -178,23 +248,109 @@
                 
                 // Add selected class to the chosen option
                 const optionId = this.id.replace('tone-', 'tone-option-');
-                document.getElementById(optionId).classList.add('selected');
+                if (document.getElementById(optionId)) {
+                    document.getElementById(optionId).classList.add('selected');
+                }
                 
-                // Show/hide custom tone textarea
+                // Show/hide custom tone textarea and save button
                 const customToneGroup = document.getElementById(`customToneGroup-${index}`);
-                if (this.id.includes('custom')) {
+                const saveToneGroup = document.getElementById(`save-tone-group-${index}`);
+                if (this.id.includes('new')) {
                     customToneGroup.style.display = 'block';
+                    saveToneGroup.style.display = 'block';
                     document.getElementById(`customTone-${index}`).focus();
                 } else {
                     customToneGroup.style.display = 'none';
+                    saveToneGroup.style.display = 'none';
                 }
             });
         });
         
+        // Function to add a new tone option to the UI
+        function addToneOption(index, toneName, toneDescription) {
+            const toneSelection = document.getElementById(`tone-selection-${index}`);
+            const newToneId = `saved-tone-${Date.now()}-${index}`;
+            
+            // Create the new tone option HTML
+            const toneOption = document.createElement('div');
+            toneOption.className = 'tone-option custom-tone-item';
+            toneOption.id = newToneId;
+            toneOption.innerHTML = `
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="tone-${index}" 
+                           id="tone-${newToneId}" value="${toneName}">
+                    <label class="form-check-label" for="tone-${newToneId}">
+                        <strong>${toneName}</strong>
+                    </label>
+                </div>
+                <div class="tone-description">${toneDescription}</div>
+            `;
+            
+            // Insert the new tone option before the "Create New Tone" option
+            const createNewOption = document.getElementById(`tone-option-new-${index}`);
+            toneSelection.insertBefore(toneOption, createNewOption);
+            
+            // Select the newly added tone
+            document.getElementById(`tone-${newToneId}`).checked = true;
+            
+            // Hide the custom tone input
+            document.getElementById(`customToneGroup-${index}`).style.display = 'none';
+        }
+
+        // Save custom tone to user's profile and update UI
+        function saveCustomTone(index) {
+            const toneName = document.getElementById(`tone-name-${index}`).value.trim();
+            const toneDescription = document.getElementById(`customTone-${index}`).value.trim();
+            
+            if (!toneName || !toneDescription) {
+                alert('Please provide both a name and description for your custom tone');
+                return;
+            }
+            
+            fetch("{{ url_for('add_tone') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `tone_name=${encodeURIComponent(toneName)}&tone_description=${encodeURIComponent(toneDescription)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Add the new tone to the UI immediately
+                    addToneOption(index, toneName, toneDescription);
+                    
+                    // Show success toast
+                    if (toast) {
+                        const toastMessage = document.getElementById('toast-message');
+                        toastMessage.textContent = 'Tone saved successfully!';
+                        toast.show();
+                    }
+                } else {
+                    alert('Failed to save tone. It may already exist.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while saving the tone');
+            });
+        }
+
         // Submit form with selected tone
         function submitWithTone(index, article) {
             const selectedTone = document.querySelector(`input[name="tone-${index}"]:checked`);
-            const customTone = document.getElementById(`customTone-${index}`).value;
+            let toneValue = selectedTone.value;
+            let customTone = '';
+            
+            // If custom tone is selected but not saved
+            if (toneValue === 'custom') {
+                customTone = document.getElementById(`customTone-${index}`).value.trim();
+                if (!customTone) {
+                    alert('Please describe your custom tone');
+                    return;
+                }
+                toneValue = customTone;
+            }
             
             // Create a form and submit it
             const form = document.createElement('form');
@@ -205,7 +361,7 @@
             const toneInput = document.createElement('input');
             toneInput.type = 'hidden';
             toneInput.name = 'tone';
-            toneInput.value = selectedTone.value === 'custom' ? customTone : selectedTone.value;
+            toneInput.value = toneValue;
             form.appendChild(toneInput);
             
             // Add custom tone field if needed
@@ -248,11 +404,22 @@
             });
         });
         
+        // Handle save tone button clicks
+        document.querySelectorAll('.save-tone').forEach(button => {
+            button.addEventListener('click', function() {
+                const index = this.getAttribute('data-index');
+                saveCustomTone(index);
+            });
+        });
+        
         // Initialize the selected tones
         document.querySelectorAll('input[type="radio"][name^="tone-"]:checked').forEach(radio => {
-            const index = radio.id.split('-')[2];
+            const parts = radio.id.split('-');
+            const index = parts.length > 3 ? parts[3] : parts[2];
             const optionId = radio.id.replace('tone-', 'tone-option-');
-            document.getElementById(optionId).classList.add('selected');
+            if (document.getElementById(optionId)) {
+                document.getElementById(optionId).classList.add('selected');
+            }
         });
     });
 </script>
