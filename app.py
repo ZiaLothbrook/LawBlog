@@ -4,16 +4,26 @@ from openai import AzureOpenAI
 from dotenv import load_dotenv
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import markdown
 from bs4 import BeautifulSoup
+from flask_session import Session
+import json
 
 load_dotenv()
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 app.config['UPLOAD_FOLDER'] = 'static/generated'
+
+# Session configuration
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+Session(app)
 
 # Add context processor to inject current year into all templates
 @app.context_processor
@@ -43,6 +53,17 @@ class AzureServices:
         self.conversations = {}
 
     def rewrite_content(self, original_text, tone, keywords, firm_name, location):
+        """
+        Rewrite the original content using Azure OpenAI with specified parameters
+        Args:
+            original_text: The text to be rewritten
+            tone: Desired writing tone
+            keywords: Keywords to include
+            firm_name: Law firm name
+            location: Firm location
+        Returns:
+            Rewritten content in markdown format
+        """
         response = self.text_client.chat.completions.create(
             model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
             messages=[
@@ -65,6 +86,13 @@ class AzureServices:
         return response.choices[0].message.content
 
     def generate_image(self, text_prompt):
+        """
+        Generate an image based on the text prompt using Azure DALL-E
+        Args:
+            text_prompt: Description of the desired image
+        Returns:
+            Filename of the generated image
+        """
         try:
             safe_prompt = self._get_safe_image_prompt(text_prompt)
             
@@ -93,7 +121,13 @@ class AzureServices:
             return None
         
     def _get_safe_image_prompt(self, text_prompt):
-        """Use OpenAI to generate a content-filter-safe prompt for legal blog images"""
+        """
+        Generate a content-filter-safe prompt for image generation
+        Args:
+            text_prompt: Original text prompt
+        Returns:
+            Safe, filtered prompt suitable for image generation
+        """
         response = self.text_client.chat.completions.create(
             model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
             messages=[
@@ -113,7 +147,15 @@ class AzureServices:
         return response.choices[0].message.content
 
     def edit_content(self, session_id, user_message, current_content=None):
-        """Handle conversational editing with memory"""
+        """
+        Handle conversational editing with memory of previous interactions
+        Args:
+            session_id: Unique identifier for the conversation
+            user_message: User's edit request
+            current_content: Current version of the content
+        Returns:
+            Updated content based on user's request
+        """
         if session_id not in self.conversations:
             self.conversations[session_id] = [
                 {"role": "system", "content": """
@@ -150,15 +192,57 @@ class AzureServices:
 class FileManager:
     @staticmethod
     def list_articles():
-        return [f for f in os.listdir(Config.ARTICLES_DIR) if f.endswith('.docx')]
+        """
+        List all DOCX files in the articles directory
+        Returns:
+            List of article filenames
+        """
+        articles = [f for f in os.listdir(Config.ARTICLES_DIR) if f.endswith('.docx')]
+        print(f"Found articles: {articles}")
+        return articles
+    
+    @staticmethod
+    def get_article_metadata():
+        """
+        Read and parse the metadata.json file
+        Returns:
+            Dictionary of article metadata
+        """
+        metadata_path = os.path.join(Config.ARTICLES_DIR, 'metadata.json')
+        try:
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                print(f"Read metadata content: {content}")
+                metadata = json.loads(content)
+                # Convert list to dictionary for easier lookup
+                result = {article['filename']: article for article in metadata['articles']}
+                print(f"Processed metadata: {result}")
+                return result
+        except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+            print(f"Error reading metadata: {str(e)}")
+            return {}
     
     @staticmethod
     def read_docx(filename):
+        """
+        Read content from a DOCX file
+        Args:
+            filename: Name of the DOCX file
+        Returns:
+            Extracted text content
+        """
         doc = Document(os.path.join(Config.ARTICLES_DIR, filename))
         return "\n".join([para.text for para in doc.paragraphs])
     
     @staticmethod
     def save_content(content):
+        """
+        Save generated content to a file
+        Args:
+            content: Content to save
+        Returns:
+            Filename of the saved content
+        """
         filename = f"blog_{int(time.time())}.txt"
         path = os.path.join(Config.GENERATED_DIR, filename)
         with open(path, 'w', encoding='utf-8') as f:
@@ -282,6 +366,13 @@ def dashboard():
     if not user:
         return redirect(url_for('login'))
     
+    # Get articles and their metadata
+    articles = FileManager.list_articles()
+    metadata = FileManager.get_article_metadata()
+    
+    print(f"Dashboard - Articles: {articles}")
+    print(f"Dashboard - Metadata: {metadata}")
+    
     # Combine standard tones with user's custom tones
     all_tones = [
         ('Professional', 'Formal and business-like tone suitable for corporate audiences'),
@@ -302,7 +393,8 @@ def dashboard():
     
     return render_template('dashboard.html', 
                          username=user['username'],
-                         articles=FileManager.list_articles(),
+                         articles=articles,
+                         metadata=metadata,
                          tone_options=tone_options,
                          tone_descriptions=tone_descriptions)
 
