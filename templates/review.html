@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Review Blog Post - NLBM Blog Tool{% endblock %}
+
+{% block extra_css %}
+<style>
+    .preview-container {
+        max-height: 500px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        padding: 1rem;
+    }
+    .chat-message {
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        border-radius: 0.25rem;
+    }
+    .chat-message.user {
+        background-color: #f8f9fa;
+        border-left: 3px solid #0d6efd;
+    }
+    .chat-message.assistant {
+        background-color: #e9ecef;
+        border-left: 3px solid #6c757d;
+    }
+    .chat-message .timestamp {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+    .chat-message .content {
+        margin-top: 0.5rem;
+    }
+    .chat-message .content.blog {
+        white-space: pre-wrap;
+    }
+    .nav-tabs .nav-link {
+        color: #495057;
+    }
+    .nav-tabs .nav-link.active {
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">Review Blog Post</h1>
+            <div>
+                <a href="{{ url_for('download', filename=post.filename) }}" class="btn btn-outline-primary me-2">Download Text</a>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <ul class="nav nav-tabs mb-4" id="editTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab" aria-controls="manual" aria-selected="true">Manual Editing</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="ai-tab" data-bs-toggle="tab" data-bs-target="#ai" type="button" role="tab" aria-controls="ai" aria-selected="false">AI Editor</button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="editTabsContent">
+            <!-- Manual Editing Tab -->
+            <div class="tab-pane fade show active" id="manual" role="tabpanel" aria-labelledby="manual-tab">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h2 class="h5 mb-0">Edit Content</h2>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="{{ url_for('save_changes') }}">
+                                    <div class="mb-4">
+                                        <textarea name="content" class="form-control" rows="20" style="font-size: 1.1rem; line-height: 1.8;">{{ post.content }}</textarea>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                                        <a href="{{ url_for('finalize') }}" class="btn btn-success">Finalize Post</a>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-4">
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h2 class="h5 mb-0">Live Preview</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="preview-container" id="livePreview">
+                                    {{ post.content|markdown|safe }}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h2 class="h5 mb-0">Generated Image</h2>
+                            </div>
+                            <div class="card-body">
+                                {% if image_url %}
+                                <img src="{{ image_url }}" alt="Generated blog image" class="img-fluid rounded mb-3">
+                                {% else %}
+                                <div class="alert alert-info">
+                                    No image generated yet.
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AI Editor Tab -->
+            <div class="tab-pane fade" id="ai" role="tabpanel" aria-labelledby="ai-tab">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h2 class="h5 mb-0">AI Assistant</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="chat-history mb-4">
+                                    {% for message in chat_history %}
+                                    <div class="chat-message {{ message.role }}">
+                                        <div class="d-flex justify-content-between">
+                                            <strong>{{ message.role|title }}</strong>
+                                            <span class="timestamp">{{ message.timestamp }}</span>
+                                        </div>
+                                        <div class="content {% if message.content_is_blog %}blog{% endif %}">
+                                            {% if message.content_is_blog %}
+                                            {{ message.content|markdown|safe }}
+                                            {% else %}
+                                            {{ message.content }}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <form method="POST" action="{{ url_for('review') }}">
+                                    <div class="mb-3">
+                                        <label for="edit_message" class="form-label">Edit Instructions</label>
+                                        <textarea id="edit_message" name="edit_message" class="form-control" rows="3" placeholder="Describe how you want to edit the blog post..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Apply Changes</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h2 class="h5 mb-0">Current Version</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="preview-container">
+                                    {{ post.content|markdown|safe }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Update live preview when manual editing
+    document.querySelector('textarea[name="content"]').addEventListener('input', function() {
+        const preview = document.getElementById('livePreview');
+        // This is a simple implementation - in a real app, you'd use a markdown parser
+        preview.innerHTML = this.value;
+    });
+</script>
+{% endblock %}

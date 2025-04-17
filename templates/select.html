@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Select Article - NLBM Blog Tool{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tone-option {
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s;
+    }
+    .tone-option:hover {
+        background-color: #f8f9fa;
+    }
+    .tone-option.selected {
+        border-color: #0d6efd;
+        background-color: #f0f7ff;
+    }
+    .tone-description {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    .custom-tone-container {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px dashed #dee2e6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">Customize Your Blog Post</h1>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                <i data-feather="arrow-left" class="icon-sm me-1"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+    
+    <div class="card-body">
+        <h2 class="h4 mb-3">Article: {{ article_name }}</h2>
+        
+        <form method="POST" action="{{ url_for('select_article', article=article_name) }}">
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-light">
+                            <h3 class="h5 mb-0">Writing Style</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Select Tone</label>
+                                
+                                {% for tone in tone_options %}
+                                <div class="tone-option" id="tone-option-{{ loop.index }}">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="tone" 
+                                               id="tone-{{ loop.index }}" value="{{ tone }}"
+                                               {% if loop.first %}checked{% endif %}>
+                                        <label class="form-check-label" for="tone-{{ loop.index }}">
+                                            <strong>{{ tone }}</strong>
+                                        </label>
+                                    </div>
+                                    <div class="tone-description">{{ tone_descriptions[tone] }}</div>
+                                </div>
+                                {% endfor %}
+                                
+                                <div class="tone-option" id="tone-option-custom">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="tone" 
+                                               id="tone-custom" value="custom">
+                                        <label class="form-check-label" for="tone-custom">
+                                            <strong>Custom Tone</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div id="customToneGroup" class="custom-tone-container" style="display: none;">
+                                    <div class="form-floating">
+                                        <textarea class="form-control" name="custom_tone" id="customTone"
+                                                  placeholder="Describe your desired tone..." style="height: 100px"></textarea>
+                                        <label for="customTone">Describe your preferred writing style</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-light">
+                            <h3 class="h5 mb-0">Post Details</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Keywords</label>
+                                <div class="form-text mb-2">Comma separated keywords to include in the post</div>
+                                <input type="text" name="keywords" class="form-control" placeholder="legal, advice, consultation...">
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Firm Name</label>
+                                <input type="text" name="firm" class="form-control" value="{{ firm }}" required>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Location</label>
+                                <input type="text" name="location" class="form-control" value="{{ location }}" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button type="submit" class="btn btn-primary btn-lg px-4">
+                    <i data-feather="edit-2" class="icon-sm me-1"></i>Generate Blog Post
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Handle tone selection
+    document.querySelectorAll('input[name="tone"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            // Remove selected class from all options
+            document.querySelectorAll('.tone-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            // Add selected class to the chosen option
+            const optionId = this.id.replace('tone-', 'tone-option-');
+            document.getElementById(optionId).classList.add('selected');
+            
+            // Show/hide custom tone textarea
+            const customToneGroup = document.getElementById('customToneGroup');
+            if (this.id === 'tone-custom') {
+                customToneGroup.style.display = 'block';
+                document.getElementById('customTone').focus();
+            } else {
+                customToneGroup.style.display = 'none';
+            }
+        });
+    });
+    
+    // Initialize the selected tone
+    const selectedTone = document.querySelector('input[name="tone"]:checked');
+    if (selectedTone) {
+        const optionId = selectedTone.id.replace('tone-', 'tone-option-');
+        document.getElementById(optionId).classList.add('selected');
+    }
+</script>
+{% endblock %}

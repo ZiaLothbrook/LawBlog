@@ -1,0 +1,12 @@
+flask 
+python-docx 
+azure-storage-blob 
+azure-ai-textanalytics 
+azure-identity 
+azure-cognitiveservices-vision-computervision 
+openai
+python-dotenv
+requests
+markdown
+beautifulsoup4
+gunicorn

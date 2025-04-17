@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select Tone</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container mt-4">
+    <h1>Select Your Preferred Tone</h1>
+    
+    <form method="POST">
+        <div class="mb-4">
+            <h3>Predefined Tones</h3>
+            {% for tone in tone_options %}
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="tone" 
+                       id="tone-{{ loop.index }}" value="{{ tone }}">
+                <label class="form-check-label" for="tone-{{ loop.index }}">
+                    <strong>{{ tone }}</strong>: {{ tone_descriptions[tone] }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="mb-4">
+            <h3>Or Specify Custom Tone</h3>
+            <div class="form-floating">
+                <textarea class="form-control" name="custom_tone" id="custom-tone" 
+                          placeholder="Describe your desired tone..." style="height: 100px"></textarea>
+                <label for="custom-tone">Describe your desired tone (e.g., "Professional but approachable")</label>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Continue to Generate</button>
+    </form>
+</body>
+</html>

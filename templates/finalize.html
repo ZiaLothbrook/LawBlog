@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Finalize Blog Post - NLBM Blog Tool{% endblock %}
+
+{% block extra_css %}
+<style>
+    .preview-container {
+        max-height: 600px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        padding: 1.5rem;
+    }
+    .post-meta {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">Your Blog Post is Ready!</h1>
+            <div>
+                <a href="{{ url_for('download', filename=filename) }}" class="btn btn-primary me-2">Download Text</a>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Create Another</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card-body">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h2 class="h5 mb-0">Final Preview</h2>
+                            <span class="post-meta">Created: {{ post.created }}</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="preview-container">
+                            {{ post.content|markdown|safe }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('review') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left"></i> Back to Editing
+                    </a>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-success">
+                        Create New Post <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h2 class="h5 mb-0">Post Details</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Original Article</label>
+                            <p>{{ post.original }}</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tone</label>
+                            <p>{{ post.tone }}</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Created</label>
+                            <p>{{ post.created }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h2 class="h5 mb-0">Featured Image</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if image_url %}
+                        <img src="{{ image_url }}" alt="Blog thumbnail" class="img-fluid rounded">
+                        <div class="mt-3">
+                            <a href="{{ image_url }}" download class="btn btn-sm btn-outline-primary">Download Image</a>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            No image generated for this post.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
