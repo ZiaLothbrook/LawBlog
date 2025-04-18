@@ -110,6 +110,15 @@
         line-height: 1.5;
         margin-bottom: 1.25rem;
     }
+    .additional-options {
+        border-top: 1px solid #eee;
+        padding-top: 1rem;
+        margin-top: 1rem;
+    }
+
+    .additional-options .form-floating {
+        margin-bottom: 0.75rem;
+    }
 </style>
 {% endblock %}
 
@@ -224,6 +233,26 @@
                                     </button>
                                 </div>
                             </div>
+
+                            <div class="mt-3 additional-options">
+                                <div class="form-floating mb-2">
+                                    <input type="text" class="form-control" name="keywords-{{ article_index }}" 
+                                        id="keywords-{{ article_index }}" placeholder="Keywords (comma separated)">
+                                    <label for="keywords-{{ article_index }}">Keywords (comma separated)</label>
+                                </div>
+                                
+                                <div class="form-floating mb-2">
+                                    <input type="text" class="form-control" name="firm-{{ article_index }}" 
+                                        id="firm-{{ article_index }}" placeholder="Firm name">
+                                    <label for="firm-{{ article_index }}">Firm Name</label>
+                                </div>
+                                
+                                <div class="form-floating mb-2">
+                                    <input type="text" class="form-control" name="location-{{ article_index }}" 
+                                        id="location-{{ article_index }}" placeholder="Location">
+                                    <label for="location-{{ article_index }}">Location</label>
+                                </div>
+                            </div>
                             
                             <!-- Action buttons -->
                             <div class="mt-3">
@@ -235,6 +264,7 @@
                                 </button>
                             </div>
                         </div>
+
                     </div>
                 </div>
             </div>
@@ -394,6 +424,10 @@
                 }
                 toneValue = customTone;
             }
+
+            const keywords = document.getElementById(`keywords-${index}`).value.trim();
+            const firm = document.getElementById(`firm-${index}`).value.trim();
+            const location = document.getElementById(`location-${index}`).value.trim();
             
             // Create and submit the form
             const form = document.createElement('form');
@@ -415,7 +449,28 @@
                 customToneInput.value = customTone;
                 form.appendChild(customToneInput);
             }
+
+            // Add keywords field
+            const keywordsInput = document.createElement('input');
+            keywordsInput.type = 'hidden';
+            keywordsInput.name = 'keywords';
+            keywordsInput.value = keywords;
+            form.appendChild(keywordsInput);
             
+            // Add firm field
+            const firmInput = document.createElement('input');
+            firmInput.type = 'hidden';
+            firmInput.name = 'firm';
+            firmInput.value = firm;
+            form.appendChild(firmInput);
+            
+            // Add location field
+            const locationInput = document.createElement('input');
+            locationInput.type = 'hidden';
+            locationInput.name = 'location';
+            locationInput.value = location;
+            form.appendChild(locationInput);
+
             document.body.appendChild(form);
             form.submit();
         }

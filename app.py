@@ -476,8 +476,8 @@ def select_article(article):
                          article_name=article,
                          tone_options=tone_options,
                          tone_descriptions=tone_descriptions,
-                         firm='Your Firm Name',  # Default value
-                         location='Your Location')  # Default value
+                         firm=firm,
+                         location=location)
 
 @app.route('/use_version', methods=['POST'])
 def use_version():
