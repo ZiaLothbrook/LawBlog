@@ -53,31 +53,43 @@ class AzureServices:
         self.conversations = {}
 
     def rewrite_content(self, original_text, tone, keywords, firm_name, location):
-        """
-        Rewrite the original content using Azure OpenAI with specified parameters
-        Args:
-            original_text: The text to be rewritten
-            tone: Desired writing tone
-            keywords: Keywords to include
-            firm_name: Law firm name
-            location: Firm location
-        Returns:
-            Rewritten content in markdown format
-        """
         response = self.text_client.chat.completions.create(
             model=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
             messages=[
                 {"role": "system", "content": f"""
-                    You are a legal blog post rewriter. Rewrite the article with:
-                    - At least 30% changes from original
-                    - {tone} tone
-                    - Include these keywords: {keywords}
-                    - Mention {firm_name} in {location}
-                    - Use proper markdown formatting:
-                      # Heading
-                      ## Subheading
-                      **bold** for important terms
-                      - Bullet points
+                    You are a legal blog post rewriter. There should be At least 30% changes from original. Rewrite the article following these strict guidelines:
+                    
+                    DO's:
+                    1. Use active voice
+                    2. Structure with 5 sections: introduction, 3 subheadings, and conclusion with call-to-action
+                    3. Keep length between 1000-1200 words
+                    4. Use transition sentences between sections
+                    5. Conclusion should be brief (1-2 sentences) with clear call-to-action
+                    6. Include 1-2 bulleted lists in the entire article
+                    7. Balance paragraphs and lists appropriately
+                    8. Use {tone} tone
+                    9. Include these keywords naturally: {keywords}
+                    10. Mention {firm_name} in {location} where relevant
+                    
+                    DON'Ts:
+                    1. Avoid legal jargon or complex language (keep it high-school level)
+                    2. No passive voice
+                    3. Don't use lists without context
+                    4. Limit metaphors
+                    5. Don't make conclusion too long
+                    6. Don't include more than 5 sources
+                    7. Don't exceed 1200 words
+                    8. Don't use more than 3 lists
+                    
+                    Formatting Requirements:
+                    # Main Title
+                    ## Subheading 1
+                    ### Sub-subheading (if needed)
+                    **Bold important terms**
+                    - Bullet points when appropriate
+                    [Link text](URL) for references
+                    
+                    The article must be valuable, engaging, and optimized for both readers and search engines.
                 """},
                 {"role": "user", "content": original_text}
             ],
@@ -147,21 +159,12 @@ class AzureServices:
         return response.choices[0].message.content
 
     def edit_content(self, session_id, user_message, current_content=None):
-        """
-        Handle conversational editing with memory of previous interactions
-        Args:
-            session_id: Unique identifier for the conversation
-            user_message: User's edit request
-            current_content: Current version of the content
-        Returns:
-            Updated content based on user's request
-        """
         if session_id not in self.conversations:
             self.conversations[session_id] = [
                 {"role": "system", "content": """
                     You are a legal blog post editor. When the user requests changes:
                     1. Make ONLY the requested changes
-                    2. Return the complete updated blog in markdown format
+                    2. Return the COMPLETE updated blog (not just updated part) in markdown format
                     3. Don't include any commentary or explanations
                     4. Preserve all formatting and structure
                 """}
@@ -249,44 +252,39 @@ class FileManager:
             f.write(content)
         return filename
 
-# class UserSession:
-#     USERS = {
-#         "admin": {"password": "password123", "firm": "Legal Partners", "location": "New York"}
-#     }
-    
-#     @staticmethod
-#     def login(username, password):
-#         if username in UserSession.USERS and UserSession.USERS[username]['password'] == password:
-#             session['user'] = {
-#                 'username': username,
-#                 'firm': UserSession.USERS[username]['firm'],
-#                 'location': UserSession.USERS[username]['location']
-#             }
-#             return True
-#         return False
-    
-#     @staticmethod
-#     def get_current_user():
-#         return session.get('user')
-
 class UserSession:
     USERS = {
         "admin": {
+            "email": "admin@lawfirm.com",
             "password": "password123", 
             "firm": "Legal Partners", 
             "location": "New York",
-            "custom_tones": []  # Add this line to store custom tones
+            "custom_tones": []
+        },
+        "memberhub": {
+            "email": "memberhub@newlawbusinessmodel.com",
+            "password": "memberhub123",
+            "firm": "New Law Business Model",
+            "location": "Global",
+            "custom_tones": []
         }
     }
     
     @staticmethod
-    def login(username, password):
-        if username in UserSession.USERS and UserSession.USERS[username]['password'] == password:
+    def login(email, password):
+        # Find user by email
+        user_data = next((data for data in UserSession.USERS.values() if data['email'] == email), None)
+        
+        if user_data and user_data['password'] == password:
+            # Find the username for this email
+            username = next((k for k,v in UserSession.USERS.items() if v['email'] == email), None)
+            
             session['user'] = {
                 'username': username,
-                'firm': UserSession.USERS[username]['firm'],
-                'location': UserSession.USERS[username]['location'],
-                'custom_tones': UserSession.USERS[username].get('custom_tones', [])
+                'email': email,
+                'firm': user_data['firm'],
+                'location': user_data['location'],
+                'custom_tones': user_data.get('custom_tones', [])
             }
             return True
         return False
@@ -294,44 +292,33 @@ class UserSession:
     @staticmethod
     def add_custom_tone(username, tone_name, tone_description):
         if username in UserSession.USERS:
+            # Initialize if not exists
             if 'custom_tones' not in UserSession.USERS[username]:
                 UserSession.USERS[username]['custom_tones'] = []
             
-            # Check if tone already exists
-            if not any(t['name'] == tone_name for t in UserSession.USERS[username]['custom_tones']):
+            # Check if tone with same name exists (case insensitive)
+            if not any(t['name'].lower() == tone_name.lower() 
+                      for t in UserSession.USERS[username]['custom_tones']):
                 UserSession.USERS[username]['custom_tones'].append({
-                    'name': tone_name,
-                    'description': tone_description
+                    'name': tone_name.strip(),
+                    'description': tone_description.strip()
                 })
+                # Update session
+                if 'user' in session and session['user']['username'] == username:
+                    session['user']['custom_tones'] = UserSession.USERS[username]['custom_tones']
+                    session.modified = True
                 return True
         return False
     
     @staticmethod
-    def get_current_user():
-        return session.get('user')
-
-
-class ToneSelector:
-    @staticmethod
-    def get_tone_options():
-        return [
-            "Professional",
-            "Conversational",
-            "Authoritative",
-            "Friendly",
-            "Technical"
-        ]
+    def get_custom_tones(username):
+        if username in UserSession.USERS:
+            return UserSession.USERS[username].get('custom_tones', [])
+        return []
     
     @staticmethod
-    def get_tone_description(tone):
-        descriptions = {
-            "Professional": "Formal tone suitable for corporate clients",
-            "Conversational": "Engaging, approachable style",
-            "Authoritative": "Strong, confident expert voice",
-            "Friendly": "Warm and welcoming",
-            "Technical": "Detailed with legal terminology"
-        }
-        return descriptions.get(tone, "")
+    def get_current_user():
+        return session.get('user')
 
 azure_services = AzureServices()
 
@@ -350,7 +337,7 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        if UserSession.login(request.form['username'], request.form['password']):
+        if UserSession.login(request.form['email'], request.form['password']):
             return redirect(url_for('dashboard'))
         return render_template('login.html', error="Invalid credentials")
     return render_template('login.html')
@@ -374,19 +361,18 @@ def dashboard():
     print(f"Dashboard - Metadata: {metadata}")
     
     # Combine standard tones with user's custom tones
-    all_tones = [
+    standard_tones = [
         ('Professional', 'Formal and business-like tone suitable for corporate audiences'),
-        ('Conversational', 'Casual and engaging tone that feels like a friendly discussion'),
-        ('Authoritative', 'Strong and confident tone that establishes expertise'),
+        # ('Conversational', 'Casual and engaging tone that feels like a friendly discussion'),
+        # ('Authoritative', 'Strong and confident tone that establishes expertise'),
         ('Friendly', 'Warm and approachable tone that builds rapport with readers'),
-        ('Technical', 'Detailed and precise tone focused on accuracy and technical details')
+        # ('Technical', 'Detailed and precise tone focused on accuracy and technical details')
+        ('Educational', 'Clear and informative tone designed to explain concepts and enhance understanding')
     ]
     
     # Add custom tones if they exist
-    custom_tones = user.get('custom_tones', [])
-    for tone in custom_tones:
-        all_tones.append((tone['name'], tone['description']))
-    
+    custom_tones = UserSession.get_custom_tones(user['username'])
+    all_tones = standard_tones + [(t['name'], t['description']) for t in custom_tones]
     # Convert to the format expected by the template
     tone_options = [t[0] for t in all_tones]
     tone_descriptions = {t[0]: t[1] for t in all_tones}
@@ -404,16 +390,16 @@ def add_tone():
     if not user:
         return redirect(url_for('login'))
     
-    tone_name = request.form.get('tone_name')
-    tone_description = request.form.get('tone_description')
+    tone_name = request.form.get('tone_name', '').strip()
+    tone_description = request.form.get('tone_description', '').strip()
     
-    if tone_name and tone_description:
-        if UserSession.add_custom_tone(user['username'], tone_name, tone_description):
-            # Update session with new tones
-            session['user']['custom_tones'] = UserSession.USERS[user['username']]['custom_tones']
-            return {'success': True}
+    if not tone_name:
+        return {'success': False, 'error': 'Tone name is required'}, 400
     
-    return {'success': False}
+    if UserSession.add_custom_tone(user['username'], tone_name, tone_description):
+        return {'success': True}
+    
+    return {'success': False, 'error': 'Tone with this name already exists'}, 400
 
 @app.route('/select/<article>', methods=['GET', 'POST'])
 def select_article(article):
@@ -470,18 +456,20 @@ def select_article(article):
     # Define tone options and their descriptions
     tone_options = [
         'Professional',
-        'Conversational',
-        'Authoritative',
+        # 'Conversational',
+        # 'Authoritative',
         'Friendly',
-        'Technical'
+        # 'Technical'
+        'Educational'
     ]
     
     tone_descriptions = {
         'Professional': 'Formal and business-like tone suitable for corporate audiences',
-        'Conversational': 'Casual and engaging tone that feels like a friendly discussion',
-        'Authoritative': 'Strong and confident tone that establishes expertise',
+        # 'Conversational': 'Casual and engaging tone that feels like a friendly discussion',
+        # 'Authoritative': 'Strong and confident tone that establishes expertise',
         'Friendly': 'Warm and approachable tone that builds rapport with readers',
-        'Technical': 'Detailed and precise tone focused on accuracy and technical details'
+        # 'Technical': 'Detailed and precise tone focused on accuracy and technical details'
+        'Educational': 'Clear and informative tone designed to explain concepts and enhance understanding'
     }
     
     return render_template('select.html',
